@@ -98,14 +98,19 @@ class SeeMarker(Node):
 #						print("pink / ", c, f'{p_d:.2f}, {p_a:.2f}')
 						marker_at.point.z = float(marker_type.index('pink/' + c))
 					
-					x, y = polar_to_cartesian(c_d, c_a)
+					#x, y = polar_to_cartesian(c_d, c_a)
 
-					marker_at.point.x = x
-					marker_at.point.y = y
+					#marker_at.point.x = x
+					#marker_at.point.y = y
 					
 					total_height = c_h + pink_h
 					
 					measured_d = 130.45 * math.exp(-0.017 * total_height)
+
+					x, y = ploar_to_cartesian(measured_d, c_a - 30)
+
+					marker_at.point.x = x
+					marker_at.point.y = y
 
 #					print(f'Camera coordinates: {x}, {y}')
 					self.point_publisher.publish(marker_at)
@@ -119,10 +124,10 @@ class SeeMarker(Node):
 
 
 colours = {
-	"pink":	 	((140,50,50), (170, 255, 255)),
-	"blue":		((95,175,130), (105, 200, 160)),
-	"green":	((65,160,65), (85, 195, 95)),
-	"yellow":	((25,0,0), (30, 255, 255))
+	"pink":	 	((160,119,185), (165, 131, 197)),
+	"blue":		((100,170,176), (140, 187, 189)),
+	"green":	((75,142,86), (82, 171, 98)),
+	"yellow":	((24,229,140), (27, 246, 173))
 }
 
 
