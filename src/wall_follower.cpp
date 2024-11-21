@@ -21,6 +21,8 @@
 
 #include <memory>
 
+#include <fstream>
+
 
 using namespace std::chrono_literals;
 
@@ -43,6 +45,7 @@ WallFollower::WallFollower()
 
 	// Initialise publishers
 	cmd_vel_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("cmd_vel", qos);
+    near_start_pub = this->create_publisher<std_msgs::msg::String>("n_start", qos);
 
 	// Initialise subscribers
 	scan_sub_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
@@ -60,8 +63,7 @@ WallFollower::WallFollower()
 	************************************************************/
 	update_timer_ = this->create_wall_timer(10ms, std::bind(&WallFollower::update_callback, this));
 
-	RCLCPP_INFO(this->get_logger(), "Wall follower node has been initialised");
-	RCLCPP_INFO(this->get_logger(), "Wall follower node has been initialised - Gurveer");
+	RCLCPP_INFO(this->get_logger(), "Wall follower node has been initialised - Group 4");
 }
 
 WallFollower::~WallFollower()
@@ -73,7 +75,7 @@ WallFollower::~WallFollower()
 ** Callback functions for ROS subscribers
 ********************************************************************************/
 
-#define START_RANGE	0.2
+#define START_RANGE	0.4
 
 void WallFollower::odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg)
 {
@@ -93,11 +95,20 @@ void WallFollower::odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg)
 
 	double current_x =  msg->pose.pose.position.x;
 	double current_y =  msg->pose.pose.position.y;
+    //RCLCPP_INFO(this->get_logger(), "x: %lf, y: %lf", current_x, current_y);
+    // RCLCPP_INFO(this->get_logger(), "start_x: %lf, start_y: %lf", start_x, start_y);
+    // RCLCPP_INFO(this->get_logger(), "yaw: %lf", yaw * 180 / 3.1415);
+
 	if (first)
 	{
 		start_x = current_x;
 		start_y = current_y;
 		first = false;
+        std::ofstream f;
+        f.open("./out_wall.csv");
+        RCLCPP_INFO(this->get_logger(), "star_x: %lf, start_y: %lf, yaw: %lf", start_x, start_y, yaw);
+        f << start_x << ", " << start_y << ", " << yaw << std::endl;
+        f.close();
 	}
 	else if (start_moving)
 	{
@@ -108,7 +119,7 @@ void WallFollower::odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg)
 	{
 		fprintf(stderr, "Near start Woohoo!!\n");
 		near_start = true;
-		first = true;
+		//first = true;
 		start_moving = true;
 	}
 }
@@ -153,108 +164,109 @@ void WallFollower::update_cmd_vel(double linear, double angular)
 
 bool pl_near;
 
-int maxCount = 0;
-int currentCount = 0;
-double linearSpeed = 0.0;
-double angularSpeed = 0.0;
-
+bool far_from_left = false;
 bool close_to_left = false;
 bool left_outer_turn = false;
 
 void WallFollower::update_callback()
 {
-
-    // if (near_start) update_cmd_vel(0.0, 0.0);
-    // else if (scan_data_[FRONT] < 0.35) update_cmd_vel(0, -0.8);
-    // else if (scan_data_[LEFT_FRONT] > 0.7) {
-    // // if (scan_data_[LEFT_BACK] < 0.1) update_cmd_vel(0.05, 0.0);
-    // update_cmd_vel(0.05, 0.3);
-    // }
-    // else if (scan_data_[LEFT_FRONT] < 0.3) update_cmd_vel(0.05, -0.3);
-    // else if (scan_data_[FRONT] > 0.6) update_cmd_vel(0.15, 0.0);
-    // // else if (scan_data_[LEFT_FRONT] > 0.4) update_cmd_vel(0.1, 0.5);
-    // else if (scan_data_[FRONT] < 0.25) update_cmd_vel(0.01, -0.5);
-    // else if (scan_data_[LEFT] < 0.1) update_cmd_vel(0.01, -0.5);
-    // // else if (scan_data_[RIGHT] < 0.4) update_cmd_vel(0.05, 0.35);
-    // // else if (scan_data_[LEFT] > 0.4) update_cmd_vel(0.07, 0.3);
-    // // else if (scan_data_[LEFT_BACK] > 0.4) update_cmd_vel(0.07, 0.4);
-    // else update_cmd_vel(0.1,0.0);
-
-    /*
-    #define FRONT 0
-    #define FRONT_LEFT 1
-    #define LEFT_FRONT 2
-    #define LEFT 3
-    #define LEFT_BACK 4
-    #define BACK_LEFT 5
-    #define BACK 6
-    #define BACK_RIGHT 7
-    #define RIGHT_BACK 8
-    #define RIGHT 9
-    #define RIGHT_FRONT 10
-    #define FRONT_RIGHT 11
-    FRONT_LEFT is 30 degrees to the left from the front
-    LEFT_FRONT is 30 degrees to the front from the left (i.e 60 degrees)
-    */
-    // RCLCPP_INFO(this->get_logger(), "FRONT %lf", scan_data_[FRONT]);
-    // RCLCPP_INFO(this->get_logger(), "FRONT_LEFT %lf", scan_data_[FRONT_LEFT]);
-    // RCLCPP_INFO(this->get_logger(), "FRONT_RIGHT %lf", scan_data_[FRONT_RIGHT]);
-
-    // RCLCPP_INFO(this->get_logger(), "LEFT %lf", scan_data_[LEFT]);
-    // RCLCPP_INFO(this->get_logger(), "LEFT_FRONT %lf", scan_data_[LEFT_FRONT]);
-    // RCLCPP_INFO(this->get_logger(), "LEFT_BACK %lf", scan_data_[LEFT_BACK]);
-
-    // RCLCPP_INFO(this->get_logger(), "RIGHT %lf", scan_data_[RIGHT]);
-    // RCLCPP_INFO(this->get_logger(), "RIGHT_FRONT %lf", scan_data_[RIGHT_FRONT]);
-    // RCLCPP_INFO(this->get_logger(), "RIGHT_BACK %lf", scan_data_[RIGHT_BACK]);
-
-    // RCLCPP_INFO(this->get_logger(), "BACK %lf", scan_data_[BACK]);
-    // RCLCPP_INFO(this->get_logger(), "BACK_LEFT %lf", scan_data_[BACK_LEFT]);
-    // RCLCPP_INFO(this->get_logger(), "BACK_RIGHT %lf", scan_data_[BACK_RIGHT]);
-
     double lower_radius = 0.2;
     double upper_radius = 0.35;
 
     // If at the start, stop.
     if (near_start) {
         RCLCPP_INFO(this->get_logger(), "Near start, stopping...");
-        //std::cout << "Near start, stopping..." << std::endl;
+
+        std_msgs::msg::String dummy;
+        dummy.data = "test";
+        near_start_pub -> publish(dummy);
+
         update_cmd_vel(0.0, 0.0);
         return;
     }
+
+    // If too close to the back then move forward
+    if (scan_data_[BACK] < 0.2
+    || (scan_data_[BACK_LEFT] < 0.23
+    || scan_data_[BACK_RIGHT] < 0.2)) {
+        RCLCPP_INFO(this->get_logger(), "BACK %lf", scan_data_[BACK]);
+        RCLCPP_INFO(this->get_logger(), "BACK_LEFT %lf", scan_data_[BACK_LEFT]);
+        RCLCPP_INFO(this->get_logger(), "BACK_RIGHT %lf", scan_data_[BACK_RIGHT]);
+        RCLCPP_INFO(this->get_logger(), "Too close to back, moving forward...");
+        update_cmd_vel(0.06, 0.0);
+        return;
+    }
+
+    // IF TOOO CLOSE TO THE FRONT, reverse
+    if (scan_data_[FRONT] < 0.3
+    || scan_data_[LEFT_FRONT] < 0.4
+    || scan_data_[FRONT_RIGHT] < 0.5) {
+        RCLCPP_INFO(this->get_logger(), "FRONT %lf", scan_data_[FRONT]);
+        RCLCPP_INFO(this->get_logger(), "FRONT_LEFT %lf", scan_data_[FRONT_LEFT]);
+        RCLCPP_INFO(this->get_logger(), "FRONT_RIGHT %lf", scan_data_[FRONT_RIGHT]);
+
+        RCLCPP_INFO(this->get_logger(), "Too close to front, Turning right...");
+
+        close_to_left = false;
+        left_outer_turn = false;
+        
+        update_cmd_vel(-0.0, -0.2);
+        return;
+    }
+
+    // IF TOOO CLOSE TO THE LEFT, reverse
+    if (scan_data_[LEFT] < 0.15
+    || (scan_data_[LEFT_BACK] < 0.2
+    || scan_data_[LEFT_FRONT] < 0.2)) {
+        // RCLCPP_INFO(this->get_logger(), "FRONT %lf", scan_data_[FRONT]);
+        // RCLCPP_INFO(this->get_logger(), "FRONT_LEFT %lf", scan_data_[FRONT_LEFT]);
+        // RCLCPP_INFO(this->get_logger(), "FRONT_RIGHT %lf", scan_data_[FRONT_RIGHT]);
+
+        RCLCPP_INFO(this->get_logger(), "Too close to left, Turning right...");
+
+        close_to_left = false;
+        left_outer_turn = false;
+        
+        update_cmd_vel(0.1, -0.1);
+        return;
+    }
+
 
     if (close_to_left) {
         if (scan_data_[FRONT] < 0.45
         || scan_data_[FRONT_LEFT] < 0.45
         || scan_data_[FRONT_RIGHT] < 0.45) {
-            // RCLCPP_INFO(this->get_logger(), "Too close to front");
+            RCLCPP_INFO(this->get_logger(), "Too close to front");
+            close_to_left = false;
+            return;
+        }
+
+        if (scan_data_[LEFT] > 0.3) {
             close_to_left = false;
             return;
         }
 
 		if (scan_data_[LEFT_FRONT] < lower_radius) {
-			// RCLCPP_INFO(this->get_logger(), "Turning right on the spot...");
+            RCLCPP_INFO(this->get_logger(), "LEFT FRONT %lf", scan_data_[LEFT_FRONT]);
+			RCLCPP_INFO(this->get_logger(), "Turning right on the spot...");
 			update_cmd_vel(0.0, -0.1);
 			return;
 		}
 
         if (scan_data_[LEFT] < lower_radius) {
-        // RCLCPP_INFO(this->get_logger(), "Panning out...");
-        update_cmd_vel(0.07, -0.1);
-        return;
-        } 
-		
-		if (scan_data_[LEFT] > upper_radius) {
-        close_to_left = false;
-        return;
+            RCLCPP_INFO(this->get_logger(), "Panning out...");
+            update_cmd_vel(0.14, -0.1);
+            return;
         }
+		
+		
 
         double left_front = scan_data_[LEFT_FRONT];
         double left_back = scan_data_[LEFT_BACK];
 
         if ((left_front - left_back) < -0.02) {
-			// RCLCPP_INFO(this->get_logger(), "Left back is too big, panning out...");
-			update_cmd_vel(0.07, -0.1);
+			RCLCPP_INFO(this->get_logger(), "Left back is too big, panning out...");
+			update_cmd_vel(0.14, -0.1);
 			return;
         }
 		
@@ -264,8 +276,8 @@ void WallFollower::update_callback()
         } 
 		
 		if ((left_back - left_front) < -0.02) {
-			// RCLCPP_INFO(this->get_logger(), "Left front is too big, panning in...");
-			update_cmd_vel(0.07, 0.1);
+			RCLCPP_INFO(this->get_logger(), "Left front is too big, panning in...");
+			update_cmd_vel(0.14, 0.1);
 			return;
         }
 
@@ -278,66 +290,97 @@ void WallFollower::update_callback()
         if (scan_data_[FRONT] < 0.3
         || scan_data_[FRONT_LEFT] < 0.3
         || scan_data_[FRONT_RIGHT] < 0.3) {
-            // RCLCPP_INFO(this->get_logger(), "Too close to front");
+            RCLCPP_INFO(this->get_logger(), "Too close to front");
             left_outer_turn = false;
             return;
         }
 
         if (scan_data_[LEFT] > upper_radius || scan_data_[LEFT_FRONT] > upper_radius) {
-            // RCLCPP_INFO(this->get_logger(), "No wall on left, panning in...");
-            update_cmd_vel(0.07, 0.3);
+            RCLCPP_INFO(this->get_logger(), "No wall on left, panning in...");
+            update_cmd_vel(0.14, 0.6);
             return;
         }
 
         left_outer_turn = false;
         return;
     }
-    // if (currentCount < maxCount) {
-    // update_cmd_vel(linearSpeed, angularSpeed);
-    // currentCount++;
-    // return;
-    // }
+    
 
-    // If too close to the back then move forward
-    if (scan_data_[BACK] < 0.2
-    || (scan_data_[BACK_LEFT] < 0.23
-    || scan_data_[BACK_RIGHT] < 0.2)) {
-        // RCLCPP_INFO(this->get_logger(), "BACK %lf", scan_data_[BACK]);
-        // RCLCPP_INFO(this->get_logger(), "BACK_LEFT %lf", scan_data_[BACK_LEFT]);
-        // RCLCPP_INFO(this->get_logger(), "BACK_RIGHT %lf", scan_data_[BACK_RIGHT]);
-        // RCLCPP_INFO(this->get_logger(), "Too close to back, moving forward...");
-        update_cmd_vel(0.03, 0.0);
+    if (far_from_left) {
+        if (scan_data_[FRONT] < 0.45
+        || scan_data_[FRONT_LEFT] < 0.45
+        || scan_data_[FRONT_RIGHT] < 0.45) {
+            RCLCPP_INFO(this->get_logger(), "Too close to front");
+            far_from_left = false;
+            return;
+        }
+
+        if (scan_data_[LEFT] < lower_radius) {
+            far_from_left = false;
+            return;
+        }
+
+        if (scan_data_[LEFT] > 0.7) {
+            far_from_left = false;
+            left_outer_turn = true;
+            return;
+        }
+
+        if (scan_data_[LEFT] > upper_radius && scan_data_[LEFT_BACK] < upper_radius) {
+            far_from_left = false;
+            return;
+        }
+
+        if (scan_data_[LEFT] > upper_radius) {
+            RCLCPP_INFO(this->get_logger(), "Panning in...");
+            update_cmd_vel(0.14, 0.1);
+            return;
+        }
+		
+		
+
+        double left_front = scan_data_[LEFT_FRONT];
+        double left_back = scan_data_[LEFT_BACK];
+
+        if ((left_front - left_back) < -0.02) {
+			RCLCPP_INFO(this->get_logger(), "Left back is too big, panning out...");
+			update_cmd_vel(0.14, -0.1);
+			return;
+        }
+		
+		if ((left_back - left_front) < -0.02) {
+			RCLCPP_INFO(this->get_logger(), "Left front is too big, panning in...");
+			update_cmd_vel(0.14, 0.1);
+			return;
+        }
+
+        far_from_left = false;
         return;
     }
+
+    
+      
+
 
     // If too close to the front then turn right
     if (scan_data_[FRONT] < 0.45
-    || (scan_data_[FRONT_LEFT] < 0.45
-    || scan_data_[FRONT_RIGHT] < 0.45)) {
-        // RCLCPP_INFO(this->get_logger(), "FRONT %lf", scan_data_[FRONT]);
-        // RCLCPP_INFO(this->get_logger(), "FRONT_LEFT %lf", scan_data_[FRONT_LEFT]);
-        // RCLCPP_INFO(this->get_logger(), "FRONT_RIGHT %lf", scan_data_[FRONT_RIGHT]);
+    || (scan_data_[FRONT_LEFT] < 0.3
+    || scan_data_[FRONT_RIGHT] < 0.3)) {
+        RCLCPP_INFO(this->get_logger(), "FRONT %lf", scan_data_[FRONT]);
+        RCLCPP_INFO(this->get_logger(), "FRONT_LEFT %lf", scan_data_[FRONT_LEFT]);
+        RCLCPP_INFO(this->get_logger(), "FRONT_RIGHT %lf", scan_data_[FRONT_RIGHT]);
+
+        RCLCPP_INFO(this->get_logger(), "Too close to front, Turning right...");
+
         close_to_left = false;
         left_outer_turn = false;
-        // RCLCPP_INFO(this->get_logger(), "Too close to front, Turning right...");
-        update_cmd_vel(0.0, -0.2);
+        
+        update_cmd_vel(0.0, -0.4);
         return;
     }
 
-
-    // // If too close to the back then come forward, slowly
-    // if (scan_data_[BACK] < lower_radius
-    //    || scan_data_[BACK_LEFT] < lower_radius
-    //    || scan_data_[BACK_RIGHT] < lower_radius) {
-    //     RCLCPP_INFO(this->get_logger(), "Too close to back, forwarding...");
-    //     //std::cout << "Too close to back, forwarding..." << std::endl;
-    // update_cmd_vel(0.03, 0.0);
-    // return;
-    // }
-
     if (scan_data_[LEFT] < lower_radius) {
-        // RCLCPP_INFO(this->get_logger(), "Too close to left, panning out...");
-        update_cmd_vel(0.03, -0.1);
+        RCLCPP_INFO(this->get_logger(), "Too close to left, panning out...");
         close_to_left = true;
         return;
     }
@@ -348,7 +391,7 @@ void WallFollower::update_callback()
     // immediate LEFT, then do a 90 to that wall
     if (scan_data_[LEFT] > upper_radius
     && scan_data_[LEFT_BACK] < 0.5) {
-        // RCLCPP_INFO(this->get_logger(), "No wall on left, turning left...");
+        RCLCPP_INFO(this->get_logger(), "No wall on left, turning left...");
         left_outer_turn = true;
         return;
     }
@@ -357,17 +400,20 @@ void WallFollower::update_callback()
     if (scan_data_[LEFT_FRONT] > upper_radius
     || scan_data_[LEFT] > upper_radius
     || scan_data_[LEFT_BACK] > upper_radius) {
-        // RCLCPP_INFO(this->get_logger(), "LEFT %lf", scan_data_[LEFT]);
-        // RCLCPP_INFO(this->get_logger(), "LEFT_FRONT %lf", scan_data_[LEFT_FRONT]);
-        // RCLCPP_INFO(this->get_logger(), "LEFT_BACK %lf", scan_data_[LEFT_BACK]);
+        RCLCPP_INFO(this->get_logger(), "LEFT %lf", scan_data_[LEFT]);
+        RCLCPP_INFO(this->get_logger(), "LEFT_FRONT %lf", scan_data_[LEFT_FRONT]);
+        RCLCPP_INFO(this->get_logger(), "LEFT_BACK %lf", scan_data_[LEFT_BACK]);
 
-        // RCLCPP_INFO(this->get_logger(), "Too far from left, panning in...");
-        update_cmd_vel(0.07, 0.1);
+        RCLCPP_INFO(this->get_logger(), "Too far from left, panning in...");
+        far_from_left = true;
         return;
     }
 
     // No obstruction, walk forward
-    // RCLCPP_INFO(this->get_logger(), "No obstruction, forwarding...");
+    // RCLCPP_INFO(this->get_logger(), "FRONT %lf", scan_data_[FRONT]);
+    // RCLCPP_INFO(this->get_logger(), "FRONT_LEFT %lf", scan_data_[FRONT_LEFT]);
+    // RCLCPP_INFO(this->get_logger(), "FRONT_RIGHT %lf", scan_data_[FRONT_RIGHT]);
+    RCLCPP_INFO(this->get_logger(), "No obstruction, forwarding...");
     update_cmd_vel(0.25, 0.0);
     return;
 }
