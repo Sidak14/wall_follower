@@ -16,6 +16,7 @@ import math
 from sensor_msgs.msg import Image # Image is the message type
 from sensor_msgs.msg import LaserScan # Laser scan message type
 from sensor_msgs.msg import CameraInfo # Need to know camera frame
+from std_msgs.msg import String
 from geometry_msgs.msg import Point, PointStamped
 
 import wall_follower.landmark
@@ -24,6 +25,8 @@ from wall_follower.landmark import marker_type
 
 field_of_view_h = 62.2
 field_of_view_v = 48.8
+markers = {}
+not_logged = True
 
 
 class SeeMarker(Node):
@@ -40,6 +43,7 @@ class SeeMarker(Node):
 		self.range = 0
 		self.prev_h = 0
 		self.prev_r = 0
+
 			
 		# Create the subscriber. This subscriber will receive an Image
 		# from the video_frames topic. The queue size is 10 messages.
@@ -49,12 +53,31 @@ class SeeMarker(Node):
 			self.listener_callback, 
 			10)
 		self.subscription # prevent unused variable warning
+
+		self.should_print = self.create_subscription(
+			String,
+			'/n_start',
+			self.stop_now,
+			10
+		)
+		self.should_print
 			
 		# Used to convert between ROS and OpenCV images
 		self.br = CvBridge()
 
 		self.point_publisher = self.create_publisher(PointStamped, '/marker_position', 10)
 
+	def stop_now(self, data):
+		global not_logged
+		if not_logged:
+			self.get_logger().info("Logging Markers")
+			f = open("./out_wall_2.csv", "a")
+			for marker in markers.keys():
+				f.write(f"{markers[marker][0]}, {markers[marker][1]}, {marker}\n")
+				self.get_logger().info(f"{markers[marker][0]}, {markers[marker][1]}, {marker}")
+			f.close()
+			not_logged = False
+			
 
 	def listener_callback(self, data):
 		"""
@@ -92,26 +115,32 @@ class SeeMarker(Node):
 					marker_at.header.frame_id = 'camera_link'
 
 					if c_y < pink_y:	# +y is down
-#						print(c, "/ pink", f'{c_d:.2f}, {c_a:.2f}')
 						marker_at.point.z = float(marker_type.index(c + '/pink'))
 					else:
-#						print("pink / ", c, f'{p_d:.2f}, {p_a:.2f}')
 						marker_at.point.z = float(marker_type.index('pink/' + c))
 					
-					x, y = polar_to_cartesian(c_d, c_a)
+					#x, y = polar_to_cartesian(c_d, c_a)
 
-					marker_at.point.x = x
-					marker_at.point.y = y
+					#marker_at.point.x = x
+					#marker_at.point.y = y
 					
 					total_height = c_h + pink_h
 					
 					measured_d = 130.45 * math.exp(-0.017 * total_height)
+					
+					x, y = polar_to_cartesian(measured_d, c_a - 30)
+					
+					marker_at.point.x = x / 100
+					marker_at.point.y = y / 100
 
 #					print(f'Camera coordinates: {x}, {y}')
 					self.point_publisher.publish(marker_at)
+					
 					self.get_logger().info('Published Point: x=%f, y=%f, z=%f colour=%s distance=%f' %
 						(marker_at.point.x, marker_at.point.y, marker_at.point.z, c, measured_d))
 
+					markers.update({marker_type[int(marker_at.point.z)]: [marker_at.point.x, marker_at.point.y]})
+					self.get_logger().info(str(markers))
 
 		# Display camera image
 		cv2.imshow("camera", current_frame)	
@@ -120,9 +149,9 @@ class SeeMarker(Node):
 
 colours = {
 	"pink":	 	((140,50,50), (170, 255, 255)),
-	"blue":		((95,175,130), (105, 200, 160)),
-	"green":	((65,160,65), (85, 195, 95)),
-	"yellow":	((25,0,0), (30, 255, 255))
+	"blue":		((95,194,112), (140, 207, 165)),
+	"green":	((75,142,79), (82, 210, 98)),
+	"yellow":	((24,229,140), (27, 246, 200))
 }
 
 
